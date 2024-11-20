@@ -1,0 +1,76 @@
+php
+<?php
+function getDatabaseConnection() {
+    $db = new PDO('sqlite:livraria.db');
+    $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    return $db;
+}
+function createTable() {
+    $db = getDatabaseConnection();
+    $db->exec("CREATE TABLE IF NOT EXISTS livros (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        titulo TEXT NOT NULL,
+        autor TEXT NOT NULL,
+        ano_publicacao INTEGER NOT NULL
+    );
+}
+function addBook($titulo, $autor, $ano_publicacao) {
+    $db = getDatabaseConnection();
+    $statement = $db->prepare("INSERT INTO livros (titulo, autor, ano_publicacao) VALUES (:titulo, :autor, :ano_publicacao)");
+    $statement->execute([
+        ':titulo' => $titulo,
+        ':autor' => $autor,
+        ':ano_publicacao' => $ano_publicacao
+    ];
+}
+function deleteBook($id) {
+    $db = getDatabaseConnection();
+    $statement = $db->prepare("DELETE FROM livros WHERE id = :id");
+    $statement->execute([':id' => $id]);
+}
+function listBooks() {
+    $db = getDatabaseConnection();
+    $statement = $db->query("SELECT * FROM livros ORDER BY titulo ASC");
+    return $statement->fetchAll(PDO::FETCH_ASSOC);
+}
+createTable();
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_POST['add'])) {
+        addBook($_POST['titulo'], $_POST['autor'], $_POST['ano_publicacao']);
+    } elseif (isset($_POST['delete'])) {
+        deleteBook($_POST['id']);
+    }
+    header('Location: ' . $_SERVER['PHP_SELF']);
+    exit();
+}
+$livros = listBooks();
+?>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Livraria</title>
+</head>
+<body>
+    <h1>Catálogo de Livros</h1>
+    <form method="post">
+        <input type="text" name="titulo" placeholder="Título" required>
+        <input type="text" name="autor" placeholder="Autor" required>
+        <input type="number" name="ano_publicacao" placeholder="Ano de Publicação" required>
+        <button type="submit" name="add">Adicionar Livro</button>
+    </form>
+    <h2>Livros Cadastrados</h2>
+    <ul>
+        <?php foreach ($livros as $livro): ?>
+            <li>
+                <?= htmlspecialchars($livro['titulo']) ?> por <?= htmlspecialchars($livro['autor']) ?> (<?= htmlspecialchars($livro['ano_publicacao']) ?>)
+                <form method="post" style="display:inline;">
+                    <input type="hidden" name="id" value="<?= $livro['id'] ?>">
+                    <button type="submit" name="delete">Excluir</button>
+                </form>
+            </li>
+        <?php endforeach; ?>
+    </ul>
+</body>
+</html>
