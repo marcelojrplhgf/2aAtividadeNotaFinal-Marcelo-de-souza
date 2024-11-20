@@ -1,0 +1,103 @@
+php
+<?php
+function getDatabaseConnection() {
+    $db = new PDO('sqlite:tarefas.db');
+    $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    return $db;
+}
+function createTable() {
+    $db = getDatabaseConnection();
+    $db->exec("CREATE TABLE IF NOT EXISTS tarefas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        descricao TEXT NOT NULL,
+        data_vencimento DATE NOT NULL,
+        concluida BOOLEAN DEFAULT 0
+    )");
+}
+function addTask($descricao, $data_vencimento) {
+    $db = getDatabaseConnection();
+    $statement = $db->prepare("INSERT INTO tarefas (descricao, data_vencimento) VALUES (:descricao, :data_vencimento)");
+    $statement->execute([':descricao' => $descricao, ':data_vencimento' => $data_vencimento]);
+}
+function completeTask($id) {
+    $db = getDatabaseConnection();
+    $statement = $db->prepare("UPDATE tarefas SET concluida = 1 WHERE id = :id");
+    $statement->execute([':id' => $id]);
+}
+function deleteTask($id) {
+    $db = getDatabaseConnection();
+    $statement = $db->prepare("DELETE FROM tarefas WHERE id = :id");
+    $statement->execute([':id' => $id]);
+}
+function listTasks() {
+    $db = getDatabaseConnection();
+    $statement = $db->query("SELECT * FROM tarefas ORDER BY data_vencimento ASC");
+    return $statement->fetchAll(PDO::FETCH_ASSOC);
+}
+createTable();
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_POST['add'])) {
+        addTask($_POST['descricao'], $_POST['data_vencimento']);
+    } elseif (isset($_POST['complete'])) {
+        completeTask($_POST['id']);
+    } elseif (isset($_POST['delete'])) {
+        deleteTask($_POST['id']);
+    }
+    header('Location: '.$_SERVER['PHP_SELF']);
+    exit();
+}
+$tarefas = listTasks();
+?>
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Gerenciador de Tarefas</title>
+</head>
+<body>
+    <h1>Lista de Tarefas</h1>
+    <form method="post">
+        <input type="text" name="descricao" placeholder="Descrição da tarefa" required>
+        <input type="date" name="data_vencimento" required>
+        <button type="submit" name="add">Adicionar Tarefa</button>
+    </form>
+    
+    <h2>Tarefas Não Concluídas</h2>
+    <ul>
+        <?php foreach ($tarefas as $tarefa): ?>
+            <?php if (!$tarefa['concluida']): ?>
+                <li>
+                    <?= htmlspecialchars($tarefa['descricao']) ?> - <?= htmlspecialchars($tarefa['data_vencimento']) ?>
+                    <form method="post" style="display:inline;">
+                        <input type="hidden" name="id" value="<?= $tarefa['id'] ?>">
+                        <button type="submit" name="complete">Concluir</button>
+                    </form>
+                    <form method="post" style="display:inline;">
+                        <input type="hidden" name="id" value="<?= $tarefa['id'] ?>">
+                        <button type="submit" name="delete">Excluir</button>
+                    </form>
+                </li>
+            <?php endif; ?>
+        <?php endforeach; ?>
+    </ul>
+
+    <h2>Tarefas Concluídas</h2>
+    <ul>
+        <?php foreach ($tarefas as $tarefa): ?>
+            <?php if ($tarefa['concluida']): ?>
+                <li>
+                    <?= htmlspecialchars($tarefa['descricao']) ?> - <?= htmlspecialchars($tarefa['data_vencimento']) ?>
+                    <form method="post" style="display:inline;">
+                        <input type="hidden" name="id" value="<?= $tarefa['id'] ?>">
+                        <button type="submit" name="delete">Excluir</button>
+                    </form>
+                </li>
+            <?php endif; ?>
+        <?php endforeach; ?>
+    </ul>
+</body>
+</html>
+
+
